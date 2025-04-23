@@ -108,8 +108,8 @@ if __name__ == "__main__":
     dataset_name="PAD-UFES-20"
     file_folder_path = f"./data/{dataset_name}"
     number_of_samples = 1
-    model_name = "deepseek-r1:1.5b" # "gemma3:27b" # "qwen2.5:0.5b" # "deepseek:70b"
-
+    model_name = "qwen2.5:0.5b" # "deepseek-r1:1.5b" # "gemma3:27b" # "qwen2.5:0.5b" # "deepseek:70b"
+    # llm_models_list = ["deepseek-r1:1.5b", "deepseek-r1:7b", "qwen2.5:0.5b", "qwen2.5:1.5b", "qwen2.5:7b", "gemma3:1b", "gemma3:27b"]
     # Load original dataset.
     columns_names, file_content = load_dataset(os.path.join(file_folder_path, "metadata.csv"))
     if file_content is not None:
@@ -123,15 +123,22 @@ if __name__ == "__main__":
             # # Clean the prompt to a single string if necessary.
             query_single_line = re.sub(r'\s+', ' ', prompt_template.strip())
             generated_sentence = generate_response(query_single_line, model_name=model_name)
-            
-            print(f"Generated Sentence: {generated_sentence}\n")
+            # Filter text sentences in the sentence after "</think>\n"
+            if "</think>" in generated_sentence:
+                after_think = generated_sentence.split("</think>", 1)[1].strip()
+                print("✅ Extracted text after </think>:\n")
+                print(after_think)
+            else:
+                print("❌ No </think> found in text.")
+                after_think = generated_sentence
+            print(f"Generated Sentence after filtered: {after_think}\n")
             
             processed_data.append({
                 "patient_id": data.get("patient_id"),
                 "img_id": data.get("img_id"),
                 "diagnostic": data.get("diagnostic"),
                 "template": prompt_template,
-                "sentence": generated_sentence
+                "sentence": after_think
             })
 
             # Create final DataFrame and save to CSV.
