@@ -108,7 +108,7 @@ if __name__ == "__main__":
     dataset_name="PAD-UFES-20"
     file_folder_path = f"./data/{dataset_name}"
     number_of_samples = 1
-    model_name = "qwen2.5:14b" # "deepseek:70b"
+    model_name = "deepseek-r1:1.5b" # "gemma3:27b" # "qwen2.5:0.5b" # "deepseek:70b"
 
     # Load original dataset.
     columns_names, file_content = load_dataset(os.path.join(file_folder_path, "metadata.csv"))
