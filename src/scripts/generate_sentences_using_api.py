@@ -1,57 +1,9 @@
 import os
-import re
-import pickle
-import faiss
 import pandas as pd
-from sentence_transformers import SentenceTransformer
-from transformers import pipeline
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils import request_to_llm  
+from utils import request_to_llm
 
-def generate_response(user_query, model_name="qwen2.5:14b"):
-    """
-    Generates a new, concise sentence summarizing the patient's condition.
-    The prompt is designed to force the model to create a completely new sentence,
-    avoiding any verbatim repetition from the provided data.
-    """
-    prompt = (
-    "## Instruction:\n"
-    "You are a health assistant. Based on the provided patient data, write a natural, concise summary of the patient's anamnesis (in English). "
-    "Your output must incorporate the following placeholders exactly as given:\n"
-    "  - [PATIENT_ID]: the current patient's identifier.\n"
-    "  - [PATIENT_AGE]: the patient's age.\n"
-    "  - [PATIENT_GENDER]: the patient's gender.\n"
-    "  - [LESION_LOCATION]: the location of the lesion.\n"
-    "  - [LESION_SIZE]: the lesion size in mm (formatted as 'width x height').\n"
-    "  - [FITZPATRICK_VALUE]: the Fitzpatrick skin type.\n"
-    "  - [FAMILY_HISTORY]: family medical history details.\n"
-    "  - [ENVIRONMENTAL_FACTORS]: environmental factors such as piped water, sewage system, and pesticide exposure.\n"
-    "  - [MEDICAL_HISTORY]: the patient's medical history.\n"
-    "  - [LIFESTYLE]: lifestyle details such as smoking and alcohol consumption.\n"
-    "  - [SYMPTOMS]: reported symptoms (e.g., itching, pain, changes in lesion, bleeding, elevation).\n\n"
-    "Write a natural sentence summarizing the patient's condition using the above placeholders where appropriate. "
-    "Do not include any comparisons with other patients.\n\n"
-    "Example of desired output:\n"
-    "    'Patient [PATIENT_ID] is an [PATIENT_AGE]-year-old [PATIENT_GENDER] presenting with a lesion on the [LESION_LOCATION] "
-    "measuring [LESION_SIZE]. The patient's Fitzpatrick skin type is [FITZPATRICK_VALUE]. Their family medical history is [FAMILY_HISTORY], "
-    "environmental factors include [ENVIRONMENTAL_FACTORS], and their medical history is [MEDICAL_HISTORY]. They have a history of "
-    "[LIFESTYLE] habits and report symptoms such as [SYMPTOMS].'\n\n"
-    "Make a natural sentence full-filling the targets, if there is not a specific information, don't cite it!!!"
-    "## Patient data:\n"
-    f"{user_query}\n\n"
-    "New sentence:\n"
-    )
-
-    ## Faz a requisição dos dados
-    new_sentence = request_to_llm.request_to_ollama(model_name=model_name, prompt_message=prompt)
-
-    return new_sentence
-def preprocess_patient_data(row, column_names):
-    """
-    Process patient row data and return a dictionary of non-empty values.
-    """
-    return {col: str(row[col]) for col in column_names if pd.notna(row[col]) and row[col] != ""}
 
 def load_dataset(file_path: str):
     try:
@@ -61,86 +13,139 @@ def load_dataset(file_path: str):
         print(f"Error reading file: {e}")
         return None, None
 
-def mounting_prompt(data):
-    """
-    Create a human-readable prompt from patient data.
-    """
-    prompt = f'''\n
-- Patient ID: {data.get('patient_id', 'N/A')}
-- Lesion ID: {data.get('lesion_id', 'N/A')}
-- Age: {data.get('age', 'N/A')} years old
-- Gender: {data.get('gender', 'N/A')}
-- Lesion Location: {data.get('region', 'N/A')}
-- Lesion Size: {data.get('diameter_1', 'N/A')} x {data.get('diameter_2', 'N/A')} mm
-- Fitzpatrick: {data.get('fitspatrick', 'N/A')}
-- Family Medical History:
-    - Father: {data.get('background_father', 'N/A')}
-    - Mother: {data.get('background_mother', 'N/A')}
-- Environmental Factors:
-    - Has Piped Water: {data.get('has_piped_water', 'N/A')}
-    - Has Sewage System: {data.get('has_sewage_system', 'N/A')}
-    - Pesticide Exposure: {data.get('pesticide', 'N/A')}
-- Medical History:
-    - Skin Cancer History: {data.get('skin_cancer_history', 'N/A')}
-    - Family Cancer History: {data.get('cancer_history', 'N/A')}
-- Lifestyle:
-    - Smoker: {data.get('smoke', 'N/A')}
-    - Alcohol Consumption: {data.get('drink', 'N/A')}
-- Symptoms:
-    - Itching: {data.get('itch', 'N/A')}
-    - Growth: {data.get('grew', 'N/A')}
-    - Pain: {data.get('hurt', 'N/A')}
-    - Changes in Lesion: {data.get('changed', 'N/A')}
-    - Bleeding: {data.get('bleed', 'N/A')}
-    - Elevation: {data.get('elevation', 'N/A')}
-    '''.strip()
-    return prompt
 
-def write_dataset_with_sentences(file_folder_path, dataframe, model_name, number_of_samples):
+def preprocess_patient_data(row, column_names):
     """
-    Save the dataframe with generated sentences to a CSV file.
+    Process a DataFrame row into a dict of non-empty values.
     """
-    file_path = os.path.join(file_folder_path, f"metadata_with_sentences_{model_name}_{number_of_samples}.csv")
-    dataframe.to_csv(file_path, index=False, encoding="utf-8", quotechar='"', sep=",")
-    print(f"File saved at: {file_path}")
+    data = {}
+    for col in column_names:
+        val = row[col]
+        if pd.isna(val) or val == "":
+            continue
+        data[col] = val
+    return data
+
+
+def to_inline(data: dict) -> str:
+    """
+    Convert patient data dict into a semicolon-separated inline string,
+    omitting missing or false/N/A values.
+    """
+    parts = []
+    # Basic demographics
+    if data.get("patient_id"):
+        parts.append(f"ID={data['patient_id']}")
+    if data.get("age"):
+        parts.append(f"Age={data['age']} years")
+    if data.get("gender"):
+        parts.append(f"Gender={str(data['gender']).capitalize()}")
+    if data.get("fitspatrick"):
+        parts.append(f"Fitzpatrick Skin Type={data['fitspatrick']}")
+    # Lesion details
+    if data.get("region"):
+        parts.append(f"Lesion Location={data['region'].lower()}")
+    if data.get("diameter_1") and data.get("diameter_2"):
+        parts.append(f"Lesion Size={data['diameter_1']}×{data['diameter_2']} mm")
+    # Symptoms
+    symptoms_map = {
+        "itch": "Itching",
+        "grew": "Growth",
+        "hurt": "Pain",
+        "changed": "Changes in lesion",
+        "bleed": "Bleeding",
+        "elevation": "Elevation",
+    }
+    symptoms = [label for key, label in symptoms_map.items()
+                if data.get(key) and str(data[key]).lower() not in ("false", "n/a", "0")]
+    if symptoms:
+        parts.append(f"Symptoms={', '.join(symptoms)}")
+    # Lifestyle
+    lifestyle_map = {"smoke": "Smoking", "drink": "Alcohol consumption"}
+    lifestyle = [label for key, label in lifestyle_map.items()
+                 if data.get(key) and str(data[key]).lower() not in ("false", "n/a", "0")]
+    if lifestyle:
+        parts.append(f"Lifestyle={', '.join(lifestyle)}")
+    # Environmental factors
+    env_map = {
+        "has_piped_water": "Piped water",
+        "has_sewage_system": "Sewage system",
+        "pesticide": "Pesticide exposure",
+    }
+    env = [label for key, label in env_map.items()
+           if data.get(key) and str(data[key]).lower() not in ("false", "n/a", "0")]
+    if env:
+        parts.append(f"Environmental Factors={', '.join(env)}")
+    # Family and medical history
+    family = []
+    if data.get("background_father") and str(data["background_father"]).lower() not in ("false", "n/a"):
+        family.append(f"Father: {data['background_father']}")
+    if data.get("background_mother") and str(data["background_mother"]).lower() not in ("false", "n/a"):
+        family.append(f"Mother: {data['background_mother']}")
+    if data.get("cancer_history") and str(data["cancer_history"]).lower() not in ("false", "n/a"):
+        family.append("Family cancer history")
+    if family:
+        parts.append(f"Family History={'; '.join(family)}")
+    if data.get("skin_cancer_history") and str(data["skin_cancer_history"]).lower() not in ("false", "n/a"):
+        parts.append("Medical History=Skin cancer history")
+
+    return "; ".join(parts)
+
+
+def generate_response(raw_data: str, model_name: str = "qwen2.5:14b") -> str:
+    """
+    Send the inline patient data to the LLM and request exactly one natural sentence.
+    """
+    prompt = f"""
+        System:
+        You are a clinical documentation assistant. Transform the following semicolon-separated data into exactly one fluent, professional English sentence suitable for a dermatologist’s note. Omit any missing or false values. Do not invent information.
+
+        User:
+        {raw_data}
+
+        Output sentence:
+        """
+    response = request_to_llm.request_to_ollama(model_name=model_name, prompt_message=prompt)
+    return response.strip()
+
+
+def main():
+    dataset_name = "PAD-UFES-20"
+    model_name =  "deepseek-r1:1.5b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
+    data_folder = os.path.join("data", dataset_name)
+    columns, df = load_dataset(os.path.join(data_folder, "metadata.csv"))
+    output_file = os.path.join(data_folder, f"metadata_with_sentences_new-prompt-{model_name}.csv")
+    if df is None:
+        return
+
+    results = []
+    for _, row in df.iterrows():
+        data = preprocess_patient_data(row, columns)
+        raw = to_inline(data)
+        if not raw:
+            continue
+        # COntinua a geração dos dados
+        generated_sentence = generate_response(raw, model_name=model_name)
+        # Filter text sentences in the sentence after "</think>\n"
+        if "</think>" in generated_sentence:
+            after_think = generated_sentence.split("</think>", 1)[1].strip()
+            print("✅ Extracted text after </think>:\n")
+        else:
+            print("❌ No </think> found in text.")
+            after_think = generated_sentence
+        print(f"Generated Sentence after filtered: {after_think}\n")
+                   
+        results.append({
+            "patient_id": data.get("patient_id"),
+            "img_id": data.get("img_id"),
+            "diagnostic": data.get("diagnostic"),
+            "raw_data": raw,
+            "sentence": after_think,
+        })
+
+        pd.DataFrame(results).to_csv(output_file, index=False, encoding="utf-8")
+        print(f"Saved to {output_file}")
+
 
 if __name__ == "__main__":
-    dataset_name="PAD-UFES-20"
-    file_folder_path = f"./data/{dataset_name}"
-    number_of_samples = 1
-    model_name = "qwen2.5:0.5b" # "deepseek-r1:1.5b" # "gemma3:27b" # "qwen2.5:0.5b" # "deepseek:70b"
-    # llm_models_list = ["deepseek-r1:1.5b", "deepseek-r1:7b", "qwen2.5:0.5b", "qwen2.5:1.5b", "qwen2.5:7b", "gemma3:1b", "gemma3:27b"]
-    # Load original dataset.
-    columns_names, file_content = load_dataset(os.path.join(file_folder_path, "metadata.csv"))
-    if file_content is not None:
-        processed_data = []
-
-        for _, row in file_content.iterrows():
-            data = preprocess_patient_data(row, columns_names)
-            # Create a multi-line prompt from patient data.
-            prompt_template = mounting_prompt(data)
-            
-            # # Clean the prompt to a single string if necessary.
-            query_single_line = re.sub(r'\s+', ' ', prompt_template.strip())
-            generated_sentence = generate_response(query_single_line, model_name=model_name)
-            # Filter text sentences in the sentence after "</think>\n"
-            if "</think>" in generated_sentence:
-                after_think = generated_sentence.split("</think>", 1)[1].strip()
-                print("✅ Extracted text after </think>:\n")
-                print(after_think)
-            else:
-                print("❌ No </think> found in text.")
-                after_think = generated_sentence
-            print(f"Generated Sentence after filtered: {after_think}\n")
-            
-            processed_data.append({
-                "patient_id": data.get("patient_id"),
-                "img_id": data.get("img_id"),
-                "diagnostic": data.get("diagnostic"),
-                "template": prompt_template,
-                "sentence": after_think
-            })
-
-            # Create final DataFrame and save to CSV.
-            dataframe = pd.DataFrame(processed_data)
-            write_dataset_with_sentences(file_folder_path, dataframe, model_name, number_of_samples)
+    main()
