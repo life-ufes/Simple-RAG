@@ -111,7 +111,7 @@ def generate_response(raw_data: str, model_name: str = "qwen2.5:14b") -> str:
 
 def main():
     dataset_name = "PAD-UFES-20"
-    model_name =  "deepseek-r1:1.5b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
+    model_name =  "llava:34b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
     data_folder = os.path.join("data", dataset_name)
     columns, df = load_dataset(os.path.join(data_folder, "metadata.csv"))
     output_file = os.path.join(data_folder, f"metadata_with_sentences_new-prompt-{model_name}.csv")
