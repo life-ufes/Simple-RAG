@@ -14,36 +14,32 @@ def load_image_base64(image_path):
     except Exception as e:
         raise ValueError(f"Erro ao tentar carregar o buffer da imagem! Error: {e}")
     
-
 def load_dataset(file_path: str):
     try:
         df = pd.read_csv(file_path)
-        return df['img_id']
+        return df.columns.tolist(), df
     except Exception as e:
         print(f"Error reading file: {e}")
         return None, None
-
-def generate_response_function(image_base64_content: str, model_name: str = "qwen2.5:14b") -> str:
-    prompt = f"""
-        System:
-            You are a clinical documentation assistant. Describe the image skin lesion, using professional English sentence suitable for a dermatologist’s note. Do not invent information.
-        """
     
-    response = request_to_llm_image_description.request_to_ollama(model_name=model_name, prompt_message=prompt, image_base64_content=image_base64_content)
+def generate_response_function(image_base64_content: str, model_name: str = "qwen2.5:14b") -> str:
+    response = request_to_llm_image_description.request_to_ollama(model_name=model_name, image_base64_content=image_base64_content)
     return response.strip()
 
 
 def main():
     dataset_name = "PAD-UFES-20"
-    model_name =  "deepseek-r1:70b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
-    data_folder = f"/home/wyctor/PROJETOS/Simple-RAG/data/{dataset_name}"
-    columns = load_dataset(os.path.join(data_folder, "metadata.csv"))
+    model_name =  "deepseek-r1:1.5b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
+    data_folder = f"/home/wytcor/PROJECTs/SIMPLE-RAG/data/{dataset_name}"
+    columns, dataset = load_dataset(os.path.join(data_folder, "metadata.csv"))
     output_file = os.path.join(data_folder, f"metadata_with_sentences_of_image-description_{model_name}.csv")
-
+    
+    # Add coluna com a descrição da imagem
     results = []
-    for img_patient in columns:
+    for idx, row in dataset.iterrows():
+        img_id = row['img_id']
         image_path = os.path.join(data_folder, "images")
-        image_folder_path = os.path.join(image_path, img_patient)
+        image_folder_path = os.path.join(image_path, img_id)
 
         img_buffer_content = load_image_base64(image_folder_path)
         generate_response = generate_response_function(image_base64_content=img_buffer_content, model_name=model_name)
@@ -56,16 +52,15 @@ def main():
             after_think = generate_response
         print(f"Generated Sentence after filtered: {after_think}\n")
                    
-    #     results.append({
-    #         "patient_id": data.get("patient_id"),
-    #         "img_id": data.get("img_id"),
-    #         "diagnostic": data.get("diagnostic"),
-    #         "raw_data": raw,
-    #         "sentence": after_think,
-    #     })
+        results.append({
+            "patient_id": row.get("patient_id"),
+            "img_id": row.get("img_id"),
+            "diagnostic": row.get("diagnostic"),
+            "sentence": after_think,
+        })
 
-        # pd.DataFrame(results).to_csv(output_file, index=False, encoding="utf-8")
-        #print(f"Saved to {output_file}")
+        pd.DataFrame(results).to_csv(output_file, index=False, encoding="utf-8")
+        print(f"Saved to {output_file}")
 
 
 if __name__ == "__main__":
