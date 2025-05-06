@@ -1,6 +1,6 @@
 import requests
 
-def request_to_ollama(llm_api_server_host:str="localhost", llm_api_server_port:str=11434, prompt_message:str="Describe the image", image_base64_content:str="", model_name=""):
+def request_to_ollama(llm_api_server_host:str="localhost", llm_api_server_port:str=11434, prompt_message:str="You are an experienced dermatology research assistant. Given the following base64‑encoded image of a skin lesion, write one natural, flowing paragraph that describes only its visual features—covering overall shape and symmetry, border definition, main color and any variations, approximate size, surface texture, and any surrounding skin changes such as erythema or scaling. Do not offer a diagnosis or medical opinion. Just describe the image, In a natural description paragraph.", image_base64_content:str="", model_name=""):
     url = f"http://{llm_api_server_host}:{llm_api_server_port}/api/generate"
     payload = {
         "model": model_name,
