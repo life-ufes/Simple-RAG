@@ -14,11 +14,11 @@ if __name__ == "__main__":
     #vllm_model_name="llava:34b"
     for llm_model_name in ["qwen2.5:72b", "phi4", "deepseek-r1:70b" , "gemma3:27b", "qwq"]:
         for vllm_model_name in ["llava:34b","gemma3:27b","qwen2.5:72b"]:
-            output_file = os.path.join(folder, f"metadata_with_sentences_of_patient_description_and_image-description_llm-{llm_model_name}_vllm-{vllm_model_name}.csv")
+            output_file = os.path.join(os.path.join(folder, 'vllms-and-llms-sentences'), f"metadata_with_sentences_of_patient_description_and_image-description_llm-{llm_model_name}_vllm-{vllm_model_name}.csv")
 
             # Nomes dos arquivos de entrada
-            file_history = "metadata_with_sentences_new-prompt-deepseek-r1:70b.csv"
-            file_description = "metadata_with_sentences_of_image-description_llava:34b.csv"
+            file_history = f"metadata_with_sentences_new-prompt-{llm_model_name}.csv"
+            file_description = f"metadata_with_sentences_of_image-description_{vllm_model_name}.csv"
 
             # Carrega ambos os datasets
             df_history = load_dataset(os.path.join(folder, file_history))
