@@ -29,7 +29,7 @@ def generate_response_function(image_base64_content: str, model_name: str = "qwe
 
 def main():
     dataset_name = "PAD-UFES-20"
-    model_name =  "llava:34b" # "deepseek-r1:70b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
+    model_name = "qwen2.5:72b" # "gemma3:27b" # "llava:34b" # "deepseek-r1:70b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
     data_folder = f"./data/{dataset_name}"
     columns, dataset = load_dataset(os.path.join(data_folder, "metadata.csv"))
     output_file = os.path.join(data_folder, f"metadata_with_sentences_of_image-description_{model_name}.csv")
