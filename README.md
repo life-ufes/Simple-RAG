@@ -30,5 +30,9 @@ Após isso, mude o nome do modelo a ser usado dentro do script 'generate_sentenc
 # Para descrição do conteúdo das imagens: 
 Altere o caminho da pasta das images. Exemplo: "data_folder = f"./data/{dataset_name}" no mesmo script, onde 'dataset_name' é o nome da pasta do folder usado.
 
+Além disso, adicione o(s) nome(s) dos modelos desejados. 
+Exemplo: model_name = "qwen2.5vl:32b" # "gemma3:27b" # "llava:34b" # "deepseek-r1:70b" # "qwen2.5:72b" # "phi4" 
+
 Após isso, e com o modelo LLM rodando no serviço do ollama, digite o comando:
 `python3 src/scripts/generate_sentences_by_image_description_using_api.py`
+
