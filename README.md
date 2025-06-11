@@ -36,3 +36,10 @@ Exemplo: model_name = `qwen2.5vl:32b`, `gemma3:27b`, `llava:34b` ou `qwen2.5:72b
 Após isso, e com o modelo LLM rodando no serviço do ollama, digite o comando:
 `python3 src/scripts/generate_sentences_by_image_description_using_api.py`
 
+# Fundir os metadata gerados pelas VLM's e pelas LLM's
+Os dados gerados podem ser fundidos em um único arquivo csv. Por exemplo: Vamos juntar os dados do arquivo 'metadata_with_sentences_of_image-description_gemma3:27b.csv' com os dados de 'metadata_with_sentences_new-prompt-deepseek-r1:70b.csv', os dois arquivos devem estar presentes na pasta 'data'. Depois digite no terminal:
+```bash
+    python3 ./src/scripts/create_a_fusion_of_metadata_sentences.py
+```
+
+Depois disso, um arquivo será gerado dentro da pasta `metadata_with_sentences_of_patient_description_and_image-description_llm-deepseek-r1:70b_vllm-gemma3:27b.csv`
