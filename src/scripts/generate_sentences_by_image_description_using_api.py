@@ -4,6 +4,8 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import request_to_llm, request_to_llm_image_description
 import base64
+from itertools import dropwhile
+import re
 
 def load_image_base64(image_path):
     try:
@@ -27,12 +29,41 @@ def generate_response_function(image_base64_content: str, model_name: str = "qwe
     return response.strip()
 
 
+def clean_response_header(text):
+    lines = text.splitlines()
+
+    # Typical AI-generated header patterns
+    header_patterns = [
+        r'^\s*here is.*$',
+        r'^\s*here\´s.*$',
+        r'^\s*here\’s.*$',
+        r"^\s*here's.*$",       
+        r'^\s*below is.*$',      
+        r'^\s*this is.*$',       
+        r'^\s*okay.*$',   
+    ]
+
+    # Check only if the first line (line 0) has response headers
+    first_line = lines[0].strip() if lines else ""
+    is_header = any(re.match(pattern, first_line, flags=re.IGNORECASE) for pattern in header_patterns)
+
+    if not is_header:
+        # If the first line is not a header, return the original text
+        return text
+
+    # Take everything after the first line and remove any following blank lines
+    lines_after_header = lines[1:]
+    cleaned_lines = list(dropwhile(lambda x: x.strip() == '', lines_after_header))
+
+    return "".join(cleaned_lines)
+
+
 def main():
     dataset_name = "PAD-UFES-20"
-    model_name = "qwen2.5vl:32b" # "gemma3:27b" # "llava:34b" # "deepseek-r1:70b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
-    data_folder = f"./data/{dataset_name}"
+    model_name = "llava:7b" # "gemma3:27b" # "llava:34b" # "deepseek-r1:70b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
+    data_folder = f"../../data/{dataset_name}"
     columns, dataset = load_dataset(os.path.join(data_folder, "metadata.csv"))
-    output_file = os.path.join(data_folder, f"metadata_with_sentences_of_image-description_{model_name}.csv")
+    output_file = os.path.join(data_folder, f"results/metadata_with_sentences_of_image-description_{model_name}.csv")
     
     # Add coluna com a descrição da imagem
     results = []
@@ -50,13 +81,15 @@ def main():
         else:
             print("❌ No </think> found in text.")
             after_think = generate_response
-        print(f"Generated Sentence after filtered: {after_think}\n")
+        
+        filtered_after_think = clean_response_header(after_think)
+        print(f"Generated Sentence after filtered: {filtered_after_think}\n")
                    
         results.append({
             "patient_id": row.get("patient_id"),
             "img_id": row.get("img_id"),
             "diagnostic": row.get("diagnostic"),
-            "sentence": after_think,
+            "sentence": filtered_after_think,
         })
 
         pd.DataFrame(results).to_csv(output_file, index=False, encoding="utf-8")
