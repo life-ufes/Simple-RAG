@@ -1,6 +1,6 @@
 Crie o ambiente virtual:
 
-`conda create -n simple-rag`
+`conda create -n simple-rag -y`
 
 Ativação do ambiente virtual:
 `conda activate simple-rag`

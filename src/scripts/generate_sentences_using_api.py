@@ -135,41 +135,68 @@ def generate_response(raw_data: str, model_name: str = "qwen2.5:14b") -> str:
     response = request_to_llm.request_to_ollama(model_name=model_name, prompt_message=prompt)
     return response.strip()
 
-
 def main():
-    dataset_name = "ISIC-2019" # "PAD-UFES-20"
-    model_name =  "qwen2.5:1.5b" # "qwen2.5:72b" # "phi4" # "deepseek-r1:70b" # "gemma3:27b" # "qwq" # "qwen2.5:14b" # "deepseek-r1:70b" # "qwen2.5:0.5b"
-    data_folder = os.path.join("/data", dataset_name)
+    dataset_name = "PAD-UFES-20"
+    model_name = "gemma3:4b"
+    data_folder = os.path.join("./data", dataset_name)
     columns, df = load_dataset(data_folder, dataset_name)
     output_file = os.path.join(data_folder, f"metadata_with_sentences_new-prompt-dataset-{dataset_name}-{model_name}.csv")
+
     if df is None:
         return
 
     results = []
-    for _, row in df.iterrows():
+    processed_ids = set()
+
+    # 1. Carregar resultados existentes, se houver
+    if os.path.exists(output_file):
+        try:
+            print(f"Arquivo de saída encontrado em {output_file}. Carregando dados existentes...")
+            df_existing = pd.read_csv(output_file)
+            results = df_existing.to_dict('records')
+            
+            # ✅ CORREÇÃO 2: Pega o ID diretamente da coluna 'img_id'
+            for item in results:
+                processed_ids.add(str(item['img_id']))
+                
+            print(f"Já foram processados {len(processed_ids)} registros. Continuando de onde parou...")
+        except Exception as e:
+            print(f"Não foi possível ler o arquivo de saída existente ou ele está vazio: {e}")
+            results = []
+
+    # 2. Iterar sobre o dataframe original
+    for index, row in df.iterrows():
+        
+        # Pula registros que já foram processados
+        current_id = row['img_id']
+        if current_id in processed_ids:
+            continue
+            
+        print(f"Processando registro {index + 1}/{len(df)}")
+
         data = preprocess_patient_data(row, columns)
         raw = to_inline(data, dataset_name)
         if not raw:
             continue
-        # COntinua a geração dos dados
+            
         generated_sentence = generate_response(raw, model_name=model_name)
-        # Filter text sentences in the sentence after "</think>\n"
+        
         if "</think>" in generated_sentence:
             after_think = generated_sentence.split("</think>", 1)[1].strip()
-            print("✅ Extracted text after </think>:\n")
         else:
-            print("❌ No </think> found in text.")
             after_think = generated_sentence
-        print(f"Generated Sentence after filtered: {after_think}\n")
                    
         results.append({
+            # ✅ CORREÇÃO 1: Pega o 'img_id' do dicionário 'data'
+            "img_id": data['img_id'],
             "raw_data": raw,
             "sentence": after_think,
         })
 
         pd.DataFrame(results).to_csv(output_file, index=False, encoding="utf-8")
-        print(f"Saved to {output_file}")
+        # Removi o print de salvamento de dentro do loop para não poluir a saída
 
+    print(f"\nProcesso concluído! Resultados salvos em {output_file}")
 
 if __name__ == "__main__":
     main()
